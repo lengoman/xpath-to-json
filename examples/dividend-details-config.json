@@ -1,0 +1,125 @@
+{
+  "name": "Calendar Data Extractor",
+  "description": "Extracts calendar data from HTML tables",
+  "output_sample": [
+    {
+      "symbol": "{Symbol}",
+      "exchange": "{Exchange}",
+      "price": "{Price}",
+      "change": "{Change}",
+      "change-percentage": "{Change_Percentage}",
+      "volume": "{Volume}",
+      "open": "{Open}",
+      "high": "{High}",
+      "low": "{Low}"
+    }
+  ],
+  "rules": [
+
+    {
+      "extract_type": "text",
+      "name": "history-date",
+      "xpath": "//div[@id='divvytable']/table/tbody/tr/td[1]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "history-value",
+      "xpath": "//div[@id='divvytable']/table/tbody/tr/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Symbol",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[1]/td[2]/font/a/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Exchange",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[2]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Price",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[3]/td[2]/font/b/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Change",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[4]/td[2]/font/b/font[1]/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Change_Percentage",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[4]/td[2]/font/b/font[2]/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Volume",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[5]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Open",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[6]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "High",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[7]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Low",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[8]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Prev_Close",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[9]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Shares_Out",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[10]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Market_Cap",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[11]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Div_Shr",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[12]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Ex_Div",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[13]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Pay_Date",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[14]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Div_Yield",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[15]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "Div_Frequency",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[16]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "PE_Ratio",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[17]/td[2]/font/text()"
+    },
+    {
+      "extract_type": "text",
+      "name": "EPS",
+      "xpath": "//table[@width='208' and @bgcolor='F6F6F6']/tbody/tr[18]/td[2]/font/text()"
+    }
+  ]
+}

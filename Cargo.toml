@@ -1,0 +1,15 @@
+[package]
+name = "xpath-to-json"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+scraper = "0.18"
+quick-xml = "0.31"
+sxd-xpath = "0.4"
+anyhow = "1.0"
+encoding_rs = "0.8"
+chrono = { version = "0.4", features = ["serde"] }

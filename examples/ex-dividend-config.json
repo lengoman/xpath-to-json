@@ -1,0 +1,28 @@
+{
+  "name": "Calendar Data Extractor",
+  "description": "Extracts calendar data from HTML tables",
+  "output_sample": [
+    {
+      "{months}": {
+        "{days1-31}": "{items}"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "extract_type": "text",
+      "name": "months",
+      "xpath": "//table[contains(., 'Ex-Dividend Calendar')]//th[contains(@style, 'font-size: 26px')]",
+      "for-each-item": {
+        "extract_type": "text",
+        "name": "days",
+        "xpath": "//table[contains(., 'Ex-Dividend Calendar')]//td[contains(@class,'caltabletdevt')][.//span[@style=\"color: #4B9830; font-size: 22px;\"]]/../preceding-sibling::tr[1]/td[contains(@class,'caltabletdnum')]",
+        "map-item": {
+          "extract_type": "text",
+          "name": "items",
+          "xpath": "//table[contains(., 'Ex-Dividend Calendar')]//td[contains(@class,'caltabletdevt')][.//span[@style=\"color: #4B9830; font-size: 22px;\"]]"
+        }
+      }
+    }
+  ]
+}
