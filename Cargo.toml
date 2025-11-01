@@ -13,3 +13,4 @@ sxd-xpath = "0.4"
 anyhow = "1.0"
 encoding_rs = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"

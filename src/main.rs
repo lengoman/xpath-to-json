@@ -7,6 +7,7 @@ use anyhow::{Result, Context};
 use scraper::{Html, Selector};
 use encoding_rs::{Encoding, UTF_8};
 use chrono::Datelike;
+use regex;
 
 #[derive(Parser)]
 #[command(name = "xpath-to-json")]
@@ -51,6 +52,9 @@ struct XPathRule {
     iterate_over: Option<String>,
     /// Child rules to execute for each iteration
     children: Option<Vec<XPathRule>>,
+    /// Child rules to execute for each iteration (alias for children)
+    #[serde(alias = "fields")]
+    fields: Option<Vec<XPathRule>>,
     /// For each item rule (new structure)
     #[serde(rename = "for-each-item")]
     for_each_item: Option<Box<XPathRule>>,
@@ -69,6 +73,8 @@ enum ExtractType {
     Html,
     #[serde(rename = "count")]
     Count,
+    #[serde(rename = "object")]
+    Object,
 }
 
 #[derive(Debug, Serialize)]
@@ -652,6 +658,90 @@ fn process_rule(document: &Html, rule: &XPathRule) -> Result<Value> {
         return Ok(for_each_result);
     }
     
+    // Handle Object extract type with children/fields
+    if let ExtractType::Object = &rule.extract_type {
+        let children = rule.children.as_ref().or_else(|| rule.fields.as_ref());
+        if let Some(children_rules) = children {
+            // Use a specialized XPath-to-CSS converter for the specific patterns
+            let selector_str = xpath_to_css_selector(&rule.xpath)?;
+            let selector = Selector::parse(&selector_str)
+                .map_err(|e| anyhow::anyhow!("Failed to parse selector: {}", e))?;
+            
+            let mut results = Vec::new();
+            
+            // For each matching element, process the children rules
+            for element in document.select(&selector) {
+                let mut object_result = serde_json::Map::new();
+                
+                // Process each child rule within the context of this element
+                for child_rule in children_rules {
+                    let child_selector_str = xpath_to_css_selector(&child_rule.xpath)?;
+                    let child_selector = Selector::parse(&child_selector_str)
+                        .map_err(|e| anyhow::anyhow!("Failed to parse child selector: {}", e))?;
+                    
+                    let child_value = match &child_rule.extract_type {
+                        ExtractType::Text => {
+                            let mut texts = Vec::new();
+                            for child_element in element.select(&child_selector) {
+                                let text = child_element.text().collect::<String>().trim().to_string();
+                                if !text.is_empty() {
+                                    texts.push(Value::String(text));
+                                }
+                            }
+                            if texts.len() == 1 {
+                                texts.into_iter().next().unwrap_or(Value::Null)
+                            } else {
+                                Value::Array(texts)
+                            }
+                        }
+                        ExtractType::Attribute => {
+                            let mut attrs = Vec::new();
+                            for child_element in element.select(&child_selector) {
+                                if let Some(attr_name) = &child_rule.attribute {
+                                    if let Some(attr_value) = child_element.value().attr(attr_name) {
+                                        attrs.push(Value::String(attr_value.to_string()));
+                                    }
+                                }
+                            }
+                            if attrs.len() == 1 {
+                                attrs.into_iter().next().unwrap_or(Value::Null)
+                            } else {
+                                Value::Array(attrs)
+                            }
+                        }
+                        ExtractType::Html => {
+                            let mut htmls = Vec::new();
+                            for child_element in element.select(&child_selector) {
+                                htmls.push(Value::String(child_element.html()));
+                            }
+                            if htmls.len() == 1 {
+                                htmls.into_iter().next().unwrap_or(Value::Null)
+                            } else {
+                                Value::Array(htmls)
+                            }
+                        }
+                        ExtractType::Count => {
+                            Value::Number(serde_json::Number::from(element.select(&child_selector).count()))
+                        }
+                        ExtractType::Object => Value::Null, // Nested objects not yet supported
+                    };
+                    
+                    object_result.insert(child_rule.name.clone(), child_value);
+                }
+                
+                results.push(Value::Object(object_result));
+            }
+            
+            return if results.len() == 1 {
+                Ok(results.into_iter().next().unwrap_or(Value::Null))
+            } else {
+                Ok(Value::Array(results))
+            };
+        } else {
+            return Err(anyhow::anyhow!("Object extract type requires 'children' or 'fields'"));
+        }
+    }
+    
     // Use a specialized XPath-to-CSS converter for the specific patterns
     let selector_str = xpath_to_css_selector(&rule.xpath)?;
     let selector = Selector::parse(&selector_str)
@@ -712,6 +802,10 @@ fn process_rule(document: &Html, rule: &XPathRule) -> Result<Value> {
         ExtractType::Count => {
             let count = document.select(&selector).count();
             Ok(Value::Number(serde_json::Number::from(count)))
+        }
+        ExtractType::Object => {
+            // This should have been handled above, but just in case
+            Err(anyhow::anyhow!("Object extract type must have 'children' or 'fields' defined"))
         }
     }
 }
@@ -819,25 +913,92 @@ fn xpath_to_css_selector(xpath: &str) -> Result<String> {
     // General XPath to CSS conversion for simpler patterns
     let mut css = xpath.to_string();
     
+    // Handle contains() function FIRST - convert to CSS attribute selectors
+    // This must be done before removing @ symbols
+    if css.contains("contains(") {
+        // Convert contains(concat(' ', @class, ' '), ' classname ') to CSS class selector
+        let concat_pattern = r#"contains\(concat\(' ', @(\w+), ' '\), ' ([^']+) '\)"#;
+        let re_contains_concat = regex::Regex::new(concat_pattern).unwrap();
+        css = re_contains_concat.replace_all(&css, |caps: &regex::Captures| {
+            let attr = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            let value = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+            // For class attribute, convert to CSS class selector
+            if attr == "class" {
+                format!(".{}", value.replace(" ", "."))
+            } else {
+                format!("[{}*=\"{}\"]", attr, value)
+            }
+        }).to_string();
+        
+        // Convert contains(@attribute, 'value') to CSS attribute selector
+        let attr_pattern = r#"contains\(@(\w+), ' ([^']+) '\)"#;
+        let re_contains_attr = regex::Regex::new(attr_pattern).unwrap();
+        css = re_contains_attr.replace_all(&css, |caps: &regex::Captures| {
+            let attr = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            let value = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+            if attr == "class" {
+                format!(".{}", value.replace(" ", "."))
+            } else {
+                format!("[{}*=\"{}\"]", attr, value)
+            }
+        }).to_string();
+        
+        // Convert contains(., 'text') to a more generic selector
+        if css.contains("contains(., ") {
+            // Extract the element name and use it as a basic selector
+            let parts: Vec<&str> = css.split_whitespace().collect();
+            if let Some(first_part) = parts.first() {
+                if first_part.contains("[") {
+                    let element_name = first_part.split('[').next().unwrap_or("body");
+                    css = element_name.to_string();
+                }
+            }
+        }
+    }
+    
     // Remove leading // and replace with space
     if css.starts_with("//") {
         css = css[2..].to_string();
     }
     
+    // Handle .// (current context) - replace with just space to maintain descendant relationship
+    css = css.replace(".//", " ");
+    
     // Replace // with space (descendant selector)
     css = css.replace("//", " ");
+    
+    // Handle @attribute extraction (e.g., /@href) BEFORE replacing / with space
+    // The attribute name will be extracted during processing using rule.attribute, not by CSS selector
+    let attr_pattern = r#"/@(\w+)"#;
+    let re_attr = regex::Regex::new(attr_pattern).unwrap();
+    css = re_attr.replace_all(&css, "").to_string();
     
     // Replace / with space (child selector)
     css = css.replace("/", " ");
     
-    // Replace [@attribute='value'] with [attribute="value"]
-    css = css.replace("[@", "[");
+    // Trim leading/trailing spaces and normalize multiple spaces
+    css = css.trim().to_string();
+    while css.contains("  ") {
+        css = css.replace("  ", " ");
+    }
     
-    // Remove any remaining @ symbols in attribute selectors
+    // Remove any remaining standalone @ symbols
     css = css.replace("@", "");
+    
+    // Trim again after removing @ symbols
+    css = css.trim().to_string();
     
     // Handle 'and' in attribute selectors - convert to multiple attribute selectors
     css = css.replace(" and ", "][");
+    
+    // Convert element[.class] to element.class (class selectors should not use bracket notation)
+    let class_bracket_pattern = r#"(\w+)\[\.([^\]]+)\]"#;
+    let re_class_bracket = regex::Regex::new(class_bracket_pattern).unwrap();
+    css = re_class_bracket.replace_all(&css, |caps: &regex::Captures| {
+        let element = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let class = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+        format!("{}.{}", element, class)
+    }).to_string();
     
     // Replace single quotes with double quotes
     css = css.replace("'", "\"");
@@ -876,25 +1037,6 @@ fn xpath_to_css_selector(xpath: &str) -> Result<String> {
     
     // Handle text() at the end
     css = css.replace(" text()", "");
-    
-    // Handle contains() function - convert to CSS attribute selectors
-    if css.contains("contains(") {
-        // Convert contains(@attribute, 'value') to CSS attribute selector
-        css = css.replace("contains(@", "[*=\"");
-        css = css.replace(")]", "\"]");
-        
-        // Convert contains(., 'text') to a more generic selector
-        if css.contains("contains(., ") {
-            // Extract the element name and use it as a basic selector
-            let parts: Vec<&str> = css.split_whitespace().collect();
-            if let Some(first_part) = parts.first() {
-                if first_part.contains("[") {
-                    let element_name = first_part.split('[').next().unwrap_or("body");
-                    css = element_name.to_string();
-                }
-            }
-        }
-    }
     
     Ok(css)
 }

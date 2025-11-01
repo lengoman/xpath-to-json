@@ -1,0 +1,44 @@
+{
+  "name": "Amazon Product Extractor",
+  "description": "Extracts product data for items sold at Amazon from the Slickdeals frontpage HTML.",
+  "rules": [
+    {
+      "extract_type": "object",
+      "name": "amazon-products",
+      "xpath": "//li[contains(concat(' ', @class, ' '), ' frontpageGrid__feedItem ')]",
+      "fields": [
+        {
+          "extract_type": "text",
+          "name": "store",
+          "xpath": ".//a[contains(concat(' ', @class, ' '), ' dealCard__storeLink ')]"
+        },
+        {
+          "extract_type": "text",
+          "name": "title",
+          "xpath": ".//a[contains(concat(' ', @class, ' '), ' dealCard__title ')]/text()"
+        },
+        {
+          "extract_type": "text",
+          "name": "price",
+          "xpath": ".//span[contains(concat(' ', @class, ' '), ' dealCard__price ')]/text()"
+        },
+        {
+          "extract_type": "text",
+          "name": "original_price",
+          "xpath": ".//span[contains(concat(' ', @class, ' '), ' dealCard__originalPrice ')]/text()"
+        },
+        {
+          "extract_type": "text",
+          "name": "shipping_info",
+          "xpath": ".//div[contains(concat(' ', @class, ' '), ' dealCard__note ')]/text()"
+        },
+        {
+          "extract_type": "attribute",
+          "name": "url",
+          "attribute": "href",
+          "xpath": ".//a[contains(concat(' ', @class, ' '), ' dealCard__title ')]/@href"
+        }
+      ]
+    }
+  ]
+}
